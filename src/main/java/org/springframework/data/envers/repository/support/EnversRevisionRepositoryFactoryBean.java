@@ -25,6 +25,9 @@ import org.springframework.core.GenericTypeResolver;
 import org.springframework.data.jpa.repository.support.JpaEntityInformation;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactory;
 import org.springframework.data.jpa.repository.support.JpaRepositoryFactoryBean;
+import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
+import org.springframework.data.querydsl.QueryDslPredicateExecutor;
+import org.springframework.data.querydsl.QueryDslUtils;
 import org.springframework.data.repository.core.RepositoryInformation;
 import org.springframework.data.repository.core.RepositoryMetadata;
 import org.springframework.data.repository.core.support.RepositoryFactorySupport;
@@ -37,8 +40,8 @@ import org.springframework.data.repository.history.support.RevisionEntityInforma
  * @author Oliver Gierke
  * @author Michael Igler
  */
-public class EnversRevisionRepositoryFactoryBean extends
-		JpaRepositoryFactoryBean<EnversRevisionRepository<Object, Serializable, Long>, Object, Serializable> {
+public class EnversRevisionRepositoryFactoryBean
+		extends JpaRepositoryFactoryBean<EnversRevisionRepository<Object, Serializable, Long>, Object, Serializable> {
 
 	private Class<?> revisionEntityClass;
 
@@ -65,7 +68,8 @@ public class EnversRevisionRepositoryFactoryBean extends
 	 * 
 	 * @author Oliver Gierke
 	 */
-	private static class RevisionRepositoryFactory<T, ID extends Serializable, N extends Number & Comparable<N>> extends JpaRepositoryFactory {
+	private static class RevisionRepositoryFactory<T, ID extends Serializable, N extends Number & Comparable<N>>
+			extends JpaRepositoryFactory {
 
 		private final RevisionEntityInformation revisionEntityInformation;
 		private final EntityManager entityManager;
@@ -81,8 +85,8 @@ public class EnversRevisionRepositoryFactoryBean extends
 			super(entityManager);
 			this.entityManager = entityManager;
 			revisionEntityClass = revisionEntityClass == null ? DefaultRevisionEntity.class : revisionEntityClass;
-			this.revisionEntityInformation = DefaultRevisionEntity.class.equals(revisionEntityClass) ? new DefaultRevisionEntityInformation()
-					: new ReflectionRevisionEntityInformation(revisionEntityClass);
+			this.revisionEntityInformation = DefaultRevisionEntity.class.equals(revisionEntityClass)
+					? new DefaultRevisionEntityInformation() : new ReflectionRevisionEntityInformation(revisionEntityClass);
 		}
 
 		/* 
@@ -91,11 +95,17 @@ public class EnversRevisionRepositoryFactoryBean extends
 		 */
 		@Override
 		@SuppressWarnings({ "unchecked", "rawtypes" })
-		protected EnversRevisionRepositoryImpl getTargetRepository(RepositoryInformation information) {
+		protected <T, ID extends Serializable> SimpleJpaRepository<?, ?> getTargetRepository(
+				RepositoryInformation information, EntityManager entityManager) {
 
-			JpaEntityInformation<T, Serializable> entityInformation = (JpaEntityInformation<T, Serializable>) getEntityInformation(information.getDomainType());
+			JpaEntityInformation<T, Serializable> entityInformation = (JpaEntityInformation<T, Serializable>) getEntityInformation(
+					information.getDomainType());
 
-			return new EnversRevisionRepositoryImpl<T, ID, N>(entityInformation , revisionEntityInformation, entityManager);
+			if (isQueryDslExecutor(information.getRepositoryInterface())) {
+				return new QueryDslWithEnversRevisionRepository(entityInformation, revisionEntityInformation, entityManager);
+			} else {
+				return new EnversRevisionRepositoryImpl<T, ID, N>(entityInformation, revisionEntityInformation, entityManager);
+			}
 		}
 
 		/*
@@ -104,7 +114,21 @@ public class EnversRevisionRepositoryFactoryBean extends
 		 */
 		@Override
 		protected Class<?> getRepositoryBaseClass(RepositoryMetadata metadata) {
-			return EnversRevisionRepositoryImpl.class;
+			if (isQueryDslExecutor(metadata.getRepositoryInterface())) {
+				return QueryDslWithEnversRevisionRepository.class;
+			} else {
+				return EnversRevisionRepositoryImpl.class;
+			}
+		}
+
+		/**
+		 * Returns whether the given repository interface requires a QueryDsl specific implementation to be chosen.
+		 * 
+		 * @param repositoryInterface
+		 * @return
+		 */
+		private boolean isQueryDslExecutor(Class<?> repositoryInterface) {
+			return QueryDslUtils.QUERY_DSL_PRESENT && QueryDslPredicateExecutor.class.isAssignableFrom(repositoryInterface);
 		}
 
 		/* 
@@ -123,8 +147,8 @@ public class EnversRevisionRepositoryFactoryBean extends
 				if (!revisionEntityInformation.getRevisionNumberType().equals(revisionNumberType)) {
 					throw new IllegalStateException(String.format(
 							"Configured a revision entity type of %s with a revision type of %s "
-									+ "but the repository interface is typed to a revision type of %s!", repositoryInterface,
-							revisionEntityInformation.getRevisionNumberType(), revisionNumberType));
+									+ "but the repository interface is typed to a revision type of %s!",
+							repositoryInterface, revisionEntityInformation.getRevisionNumberType(), revisionNumberType));
 				}
 			}
 
