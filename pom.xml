@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>org.springframework.data</groupId>
-	<artifactId>spring-data-envers</artifactId>
+	<artifactId>spring-data-envers-qdsl</artifactId>
 	<version>1.0.0.BUILD-SNAPSHOT</version>
 
 	<name>Spring Data Envers</name>
@@ -115,13 +115,13 @@
 			<version>${spring.version}</version>
 		</dependency>
 
-		<!-- QueryDsl -->		
+		<!-- QueryDsl -->
 		<dependency>
 			<groupId>com.mysema.querydsl</groupId>
 			<artifactId>querydsl-apt</artifactId>
 			<version>${querydsl.version}</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>com.mysema.querydsl</groupId>
 			<artifactId>querydsl-jpa</artifactId>
